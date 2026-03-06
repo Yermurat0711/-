@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import confetti from 'canvas-confetti';
 import { Brain, Trophy, ArrowRight, CheckCircle2, XCircle, Play, RotateCcw, Volume2, VolumeX, Sparkles, Loader2, Lightbulb } from 'lucide-react';
 import { generateGameRounds, Round } from './services/gemini';
+import { rounds as staticRounds } from './data';
 
-type GameState = 'intro' | 'generating' | 'playing' | 'round_result' | 'game_over';
+type GameState = 'intro' | 'generating' | 'playing' | 'round_result' | 'game_over' | 'error';
 
 const FloatingOrbs = () => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -25,6 +26,7 @@ export default function App() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [activeHint, setActiveHint] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -45,6 +47,7 @@ export default function App() {
 
   const startGame = async () => {
     setGameState('generating');
+    setErrorMessage(null);
     try {
       const generatedRounds = await generateGameRounds(10);
       setRounds(generatedRounds);
@@ -55,9 +58,27 @@ export default function App() {
       setActiveHint(null);
       setGameState('playing');
     } catch (error: any) {
-      console.error("Failed to generate rounds:", error);
-      alert(`Ошибка: ${error.message || error}`);
-      setGameState('intro');
+      console.error("Failed to generate rounds, falling back to static data:", error);
+      
+      // Fallback to static data
+      const normalizedStaticRounds: Round[] = staticRounds.map(r => ({
+        id: r.id,
+        imageUrls: r.images,
+        hints: ["Подсказка 1", "Подсказка 2", "Подсказка 3"], // Default hints for static data
+        answer: r.answer,
+        explanation: r.explanation
+      }));
+      
+      setRounds(normalizedStaticRounds);
+      setCurrentRound(0);
+      setTeam1Score(0);
+      setTeam2Score(0);
+      setShowAnswer(false);
+      setActiveHint(null);
+      setGameState('playing');
+      
+      // Optional: show a small notification that we are using pre-defined rounds
+      console.log("Using static fallback rounds due to API error.");
     }
   };
 
@@ -425,13 +446,23 @@ export default function App() {
                   </div>
                 )}
 
-                <button 
-                  onClick={startGame}
-                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold py-5 px-10 rounded-2xl flex items-center justify-center gap-3 mx-auto transition-all active:scale-[0.98] text-lg"
-                >
-                  <RotateCcw className="w-6 h-6" />
-                  Создать новую игру
-                </button>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mx-auto">
+                  <button 
+                    onClick={startGame}
+                    className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-bold py-5 px-10 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_0_30px_rgba(99,102,241,0.4)] text-lg"
+                  >
+                    <RotateCcw className="w-6 h-6" />
+                    Играть снова (те же команды)
+                  </button>
+                  
+                  <button 
+                    onClick={() => setGameState('intro')}
+                    className="w-full sm:w-auto bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold py-5 px-10 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] text-lg"
+                  >
+                    <Play className="w-6 h-6" />
+                    Изменить команды
+                  </button>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
